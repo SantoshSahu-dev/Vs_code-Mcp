@@ -1,0 +1,34 @@
+{
+  "name": "code-bridge-vscode",
+  "displayName": "Code Bridge",
+  "version": "1.0.0",
+  "license": "MIT",
+  "publisher": "local",
+  "engines": { "vscode": "^1.102.0" },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [{ "command": "codeBridge.showStatus", "title": "Code Bridge: Show Status" }],
+    "configuration": {
+      "title": "Code Bridge",
+      "properties": {
+        "codeBridge.token": {
+          "type": "string",
+          "default": "",
+          "description": "The same secret as CODE_BRIDGE_TOKEN. Used only on localhost to authenticate the bridge."
+        },
+        "codeBridge.port": {
+          "type": "number",
+          "default": 3334,
+          "description": "Localhost port used by the Code Bridge extension."
+        },
+        "codeBridge.serverPort": {
+          "type": "number",
+          "default": 3333,
+          "description": "Localhost port used by the Code Bridge server."
+        }
+      }
+    }
+  }
+}

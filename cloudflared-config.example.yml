@@ -1,0 +1,22 @@
+# Stable named Cloudflare Tunnel configuration template for Code Bridge.
+# Copy to ~/.cloudflared/config.yml (Linux/macOS) or %USERPROFILE%\.cloudflared\config.yml (Windows)
+# only after completing the Cloudflare tunnel creation and DNS hostname mapping.
+# This template deliberately contains safe placeholders and zero credentials.
+
+tunnel: REPLACE_WITH_TUNNEL_UUID
+
+# Replace with the path to your credentials file:
+# Linux/macOS:
+# credentials-file: /home/<username>/.cloudflared/REPLACE_WITH_TUNNEL_UUID.json
+# Windows:
+credentials-file: C:\Users\<Username>\.cloudflared\REPLACE_WITH_TUNNEL_UUID.json
+
+ingress:
+  # Replace with your dedicated sub-domain (e.g. code-bridge.example.com)
+  - hostname: code-bridge.REPLACE_WITH_YOUR_DOMAIN
+    # Forward exclusively to the MCP server on port 3333.
+    # CRITICAL: The local VS Code service on port 3334 must NEVER be forwarded or exposed!
+    service: http://127.0.0.1:3333
+
+  # Required catch-all: all other hostnames and traffic are dropped with 404
+  - service: http_status:404

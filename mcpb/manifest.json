@@ -1,0 +1,45 @@
+{
+  "manifest_version": "0.3",
+  "name": "code-bridge-local",
+  "display_name": "Code Bridge (Local)",
+  "version": "1.0.0",
+  "description": "Approval-first local code workspace bridge for Claude Desktop.",
+  "author": {
+    "name": "Code Bridge"
+  },
+  "server": {
+    "type": "node",
+    "entry_point": "server/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/server/index.js"],
+      "env": {
+        "CODE_BRIDGE_WORKSPACE": "${user_config.workspace}",
+        "CODE_BRIDGE_TOKEN": "${user_config.token}",
+        "CODE_BRIDGE_AUTO_APPROVE_WRITES": "false"
+      }
+    }
+  },
+  "tools_generated": true,
+  "compatibility": {
+    "platforms": ["win32"],
+    "runtimes": {
+      "node": ">=20.0.0"
+    }
+  },
+  "user_config": {
+    "workspace": {
+      "type": "directory",
+      "title": "Approved workspace",
+      "description": "Select the one project Code Bridge may access.",
+      "required": true
+    },
+    "token": {
+      "type": "string",
+      "title": "Code Bridge token",
+      "description": "Enter the existing 32-or-more-character CODE_BRIDGE_TOKEN.",
+      "sensitive": true,
+      "required": true
+    }
+  }
+}

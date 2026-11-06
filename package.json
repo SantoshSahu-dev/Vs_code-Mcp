@@ -1,0 +1,44 @@
+{
+  "name": "code-bridge-mcp",
+  "version": "1.0.0",
+  "license": "MIT",
+  "private": true,
+  "description": "A local, approval-first MCP bridge between web AI chats and VS Code.",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "start": "node dist/server.js",
+    "start:stdio": "node dist/stdio.js",
+    "approve": "tsx src/approve-cli.ts",
+    "oauth:generate": "node scripts/generate-oauth-credentials.mjs",
+    "stage:mcpb": "npm run build && node scripts/package-mcpb.mjs",
+    "validate:mcpb": "npm run stage:mcpb && mcpb validate mcpb-build",
+    "package:mcpb": "npm run validate:mcpb && mcpb pack mcpb-build code-bridge.mcpb && mcpb info code-bridge.mcpb",
+    "test:mcpb": "node scripts/test-mcpb.mjs",
+    "dev": "nodemon --watch src --ext ts,json --ignore node_modules --exec tsx src/server.ts",
+    "test:transport": "node --input-type=module -e \"import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'; import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'; const server = new McpServer({name:'transport-test',version:'1'}); const transport = new WebStandardStreamableHTTPServerTransport({sessionIdGenerator:undefined,enableJsonResponse:true}); await server.connect(transport); const request = new Request('https://example.invalid/mcp',{method:'POST',headers:{'content-type':'application/json','accept':'application/json, text/event-stream'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'initialize',params:{protocolVersion:'2025-03-26',capabilities:{},clientInfo:{name:'test',version:'1'}}})}); const response = await transport.handleRequest(request); if (response.status !== 200 || !response.headers.get('content-type')?.startsWith('application/json')) throw new Error('Expected a JSON Streamable HTTP response'); console.log('Transport test passed: application/json'); await transport.close();\"",
+    "test:security": "tsx --test --test-concurrency=1 test/**/*.test.ts",
+    "test": "npm run test:transport && npm run test:security",
+    "diagnose": "node scripts/diagnose-connection.mjs",
+    "package:extension": "npm run build:extension && cd vscode-extension && node ../node_modules/@vscode/vsce/vsce package --out ../code-bridge-vscode.vsix --allow-missing-repository",
+    "build:extension": "tsc -p vscode-extension/tsconfig.json"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.25.1",
+    "dotenv": "^16.6.1",
+    "express": "^5.1.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@anthropic-ai/mcpb": "^2.1.2",
+    "@types/express": "^5.0.3",
+    "@types/node": "^24.0.0",
+    "@types/vscode": "^1.102.0",
+    "@vscode/vsce": "^3.6.0",
+    "nodemon": "^3.1.14",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.3"
+  }
+}

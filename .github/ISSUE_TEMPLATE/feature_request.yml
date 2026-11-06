@@ -1,0 +1,33 @@
+name: Feature Request
+description: Propose a new feature, tool, or enhancement for Code Bridge
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for suggesting an enhancement for Code Bridge!
+        *Please note: Code Bridge operates strictly under an approval-first security model. Features that bypass human approval or break workspace isolation will not be accepted.*
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or Use Case
+      description: Is your feature request related to a specific problem or missing capability?
+      placeholder: I want to be able to ... because ...
+    validations:
+      required: true
+  - type: textarea
+    id: proposed_solution
+    attributes:
+      label: Proposed Solution
+      description: Describe your proposed enhancement and how it fits into the Code Bridge architecture.
+    validations:
+      required: true
+  - type: textarea
+    id: security_considerations
+    attributes:
+      label: Security Considerations
+      description: How does this proposed feature preserve approval-first safety and workspace isolation?
+    validations:
+      required: true
+

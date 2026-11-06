@@ -1,0 +1,56 @@
+name: Bug Report
+description: Report a bug or unexpected behavior in Code Bridge
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug report!
+        *If you are reporting a security vulnerability, please do NOT file a public issue. Follow our [Security Policy](https://github.com/owner/code-bridge/blob/main/SECURITY.md) instead.*
+  - type: input
+    id: environment
+    attributes:
+      label: Operating System & Node.js Version
+      description: What OS and Node.js version are you running? (e.g. Windows 11, Node v20.12.0)
+      placeholder: Windows 11 / Ubuntu 22.04 / macOS Sonoma, Node v20.x
+    validations:
+      required: true
+  - type: dropdown
+    id: client
+    attributes:
+      label: AI Client or MCP Host
+      options:
+        - Claude Web (claude.ai)
+        - Claude Desktop
+        - Google Gemini Custom Apps (gemini.google.com)
+        - ChatGPT Custom MCP / Custom GPT
+        - Antigravity IDE
+        - Other MCP Client / REST API
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Description of the Bug
+      description: Clear and concise description of what happened versus what you expected.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Step-by-step instructions to reproduce the issue.
+      placeholder: |
+        1. Set CODE_BRIDGE_WORKSPACE to ...
+        2. Run 'npm start'
+        3. Attempt to ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Log Output
+      description: Paste any error messages or non-sensitive log output here. (Please redact private tokens or paths!)
+      render: shell
+

@@ -1,0 +1,54 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Build & Test (Node ${{ matrix.node-version }} on ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node-version: [20.x, 22.x]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck TypeScript
+        run: npm run typecheck
+
+      - name: Build MCP server
+        run: npm run build
+
+      - name: Build VS Code extension
+        run: npm run build:extension
+
+      - name: Run MCP transport test
+        run: npm run test:transport
+
+      - name: Run security & integration test suite
+        run: npm run test:security
+
+      - name: Package & verify MCPB bundle
+        run: |
+          npm run package:mcpb
+          npm run test:mcpb
+
+      - name: Package VS Code extension (.vsix)
+        run: npm run package:extension
+

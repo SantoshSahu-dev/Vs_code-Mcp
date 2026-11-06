@@ -19,7 +19,7 @@
     "test:mcpb": "node scripts/test-mcpb.mjs",
     "dev": "nodemon --watch src --ext ts,json --ignore node_modules --exec tsx src/server.ts",
     "test:transport": "node --input-type=module -e \"import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'; import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js'; const server = new McpServer({name:'transport-test',version:'1'}); const transport = new WebStandardStreamableHTTPServerTransport({sessionIdGenerator:undefined,enableJsonResponse:true}); await server.connect(transport); const request = new Request('https://example.invalid/mcp',{method:'POST',headers:{'content-type':'application/json','accept':'application/json, text/event-stream'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'initialize',params:{protocolVersion:'2025-03-26',capabilities:{},clientInfo:{name:'test',version:'1'}}})}); const response = await transport.handleRequest(request); if (response.status !== 200 || !response.headers.get('content-type')?.startsWith('application/json')) throw new Error('Expected a JSON Streamable HTTP response'); console.log('Transport test passed: application/json'); await transport.close();\"",
-    "test:security": "tsx --test --test-concurrency=1 test/**/*.test.ts",
+    "test:security": "node scripts/run-tests.mjs",
     "test": "npm run test:transport && npm run test:security",
     "diagnose": "node scripts/diagnose-connection.mjs",
     "package:extension": "npm run build:extension && cd vscode-extension && node ../node_modules/@vscode/vsce/vsce package --out ../code-bridge-vscode.vsix --allow-missing-repository",

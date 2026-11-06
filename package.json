@@ -36,7 +36,7 @@
     "@types/express": "^5.0.3",
     "@types/node": "^24.0.0",
     "@types/vscode": "^1.102.0",
-    "@vscode/vsce": "^3.6.0",
+    "@vscode/vsce": "^4.1.0",
     "nodemon": "^3.1.14",
     "tsx": "^4.20.0",
     "typescript": "^5.8.3"

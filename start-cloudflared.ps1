@@ -134,5 +134,54 @@ foreach ($hm in $hostMatches) {
 # 7. Validate ingress rules with cloudflared and start tunnel
 & $cfExe --config $ConfigPath tunnel ingress validate
 if ($LASTEXITCODE -ne 0) { throw 'Tunnel ingress validation failed.' }
+
+function Set-ActiveTunnelState([string]$Url, [int]$ProcessId, [int]$SupervisorProcessId, [bool]$IsActive, [string]$TunnelType = 'named') {
+  $logDir = Join-Path $root 'logs'
+  if (-not (Test-Path -LiteralPath $logDir)) { New-Item -ItemType Directory -Path $logDir | Out-Null }
+  $stateFile = Join-Path $logDir 'active-tunnel.json'
+  $tempFile = Join-Path $logDir "active-tunnel.json.$([Guid]::NewGuid().ToString('N')).tmp"
+  $state = @{
+    url = $Url
+    tunnelType = $TunnelType
+    pid = $ProcessId
+    supervisorPid = $SupervisorProcessId
+    startedAt = [DateTime]::UtcNow.ToString('o')
+    active = $IsActive
+    target = "http://127.0.0.1:$currentPort"
+  }
+  try {
+    $json = $state | ConvertTo-Json -Depth 4
+    [System.IO.File]::WriteAllText($tempFile, $json, [System.Text.UTF8Encoding]::new($false))
+    Move-Item -LiteralPath $tempFile -Destination $stateFile -Force
+  }
+  finally {
+    if (Test-Path -LiteralPath $tempFile) {
+      Remove-Item -LiteralPath $tempFile -Force -ErrorAction SilentlyContinue
+    }
+  }
+}
+
+$primaryHost = if ($hostMatches.Count -gt 0) { $hostMatches[0].Groups[1].Value.Trim() } else { "unknown" }
+
 Write-Host "Local security verification validated (passed $($report.passedAt) for $resolvedWs). Starting Cloudflare tunnel..."
-& $cfExe --config $ConfigPath tunnel run
+Write-Host "Active permanent endpoint: https://$primaryHost/mcp" -ForegroundColor Green
+
+$cfArgs = "--config `"$ConfigPath`" tunnel run"
+$process = Start-Process -FilePath $cfExe -ArgumentList $cfArgs -PassThru -NoNewWindow
+if (-not $process -or $process.HasExited) { throw 'Failed to start cloudflared named tunnel process.' }
+
+Set-ActiveTunnelState -Url "https://$primaryHost" -ProcessId $process.Id -SupervisorProcessId $PID -IsActive $true -TunnelType 'named'
+
+try {
+  while (-not $process.HasExited) {
+    Start-Sleep -Seconds 1
+  }
+}
+finally {
+  Set-ActiveTunnelState -Url "https://$primaryHost" -ProcessId ($process.Id) -SupervisorProcessId $PID -IsActive $false -TunnelType 'named'
+  if ($process -and -not $process.HasExited) {
+    Write-Host "`nStopping Cloudflare Named Tunnel..." -ForegroundColor Cyan
+    Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+    Write-Host "Named tunnel stopped cleanly." -ForegroundColor Green
+  }
+}

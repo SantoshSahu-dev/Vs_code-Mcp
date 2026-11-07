@@ -181,6 +181,34 @@ if (-not $capturedUrl) {
   throw "Timed out waiting for Cloudflare to assign a Quick Tunnel URL. Check logs\quick-tunnel.log."
 }
 
+function Set-ActiveTunnelState([string]$Url, [int]$ProcessId, [int]$SupervisorProcessId, [bool]$IsActive, [string]$TunnelType = 'quick') {
+  $logDir = Join-Path $root 'logs'
+  if (-not (Test-Path -LiteralPath $logDir)) { New-Item -ItemType Directory -Path $logDir | Out-Null }
+  $stateFile = Join-Path $logDir 'active-tunnel.json'
+  $tempFile = Join-Path $logDir "active-tunnel.json.$([Guid]::NewGuid().ToString('N')).tmp"
+  $state = @{
+    url = $Url
+    tunnelType = $TunnelType
+    pid = $ProcessId
+    supervisorPid = $SupervisorProcessId
+    startedAt = [DateTime]::UtcNow.ToString('o')
+    active = $IsActive
+    target = "http://127.0.0.1:$currentPort"
+  }
+  try {
+    $json = $state | ConvertTo-Json -Depth 4
+    [System.IO.File]::WriteAllText($tempFile, $json, [System.Text.UTF8Encoding]::new($false))
+    Move-Item -LiteralPath $tempFile -Destination $stateFile -Force
+  }
+  finally {
+    if (Test-Path -LiteralPath $tempFile) {
+      Remove-Item -LiteralPath $tempFile -Force -ErrorAction SilentlyContinue
+    }
+  }
+}
+
+Set-ActiveTunnelState -Url $capturedUrl -ProcessId $process.Id -SupervisorProcessId $PID -IsActive $true -TunnelType 'quick'
+
 Write-Host "`n========================================================" -ForegroundColor Green
 Write-Host "  QUICK TUNNEL ACTIVE (TEMPORARY URL)" -ForegroundColor Green
 Write-Host "========================================================" -ForegroundColor Green
@@ -278,16 +306,126 @@ Write-Host "     (Or in GPT Action settings, click 'Import from URL': $capturedU
 Write-Host "  3. Set Authentication to 'API Key' -> 'Bearer' and enter your CODE_BRIDGE_TOKEN."
 Write-Host "  4. Test a read action (e.g. listFiles).`n"
 Write-Host "NOTE: Quick Tunnel URLs are temporary and regenerate whenever restarted." -ForegroundColor Gray
+Write-Host "ChatGPT cannot dynamically update its saved connector URL. When Quick Tunnel restarts," -ForegroundColor Gray
+Write-Host "the connector in ChatGPT must be updated to the new URL." -ForegroundColor Gray
+Write-Host "For a permanent URL that never changes, use Cloudflare Named Tunnel (.\start-cloudflared.ps1).`n" -ForegroundColor Yellow
+
+Write-Host ">>> QUICK TUNNEL SUPERVISOR ACTIVE <<<" -ForegroundColor Green
+Write-Host "Monitoring local server health and Cloudflare Quick Tunnel connection..." -ForegroundColor Cyan
 Write-Host "Press Ctrl+C to safely shut down the tunnel.`n"
 
-# Keep tunnel running until user cancels
+# Supervisor loop: monitors server health and auto-recovers tunnel drops
 try {
-  while (-not $process.HasExited) {
-    Start-Sleep -Seconds 1
+  $probeCounter = 0
+  $consecutiveFailures = 0
+  while ($true) {
+    Start-Sleep -Seconds 2
+    $probeCounter++
+
+    # 1. Periodically check health (every ~10 seconds)
+    # Do NOT restart cloudflared solely because local server is unavailable
+    if ($probeCounter % 5 -eq 0) {
+      # Local MCP Server check
+      try {
+        $localRes = Invoke-WebRequest -Uri "http://127.0.0.1:$currentPort/health" -Method Get -Headers @{ Authorization = "Bearer $token" } -UseBasicParsing -TimeoutSec 3 -ErrorAction Stop
+        if ($localRes.StatusCode -ne 200) {
+          Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Local MCP Server: Responded with HTTP $($localRes.StatusCode)" -ForegroundColor Yellow
+        }
+      }
+      catch {
+        Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Local MCP Server: UNREACHABLE on port $currentPort. Start it with 'npm start'." -ForegroundColor Red
+      }
+
+      # Separate public tunnel endpoint check (distinguishing local server from public tunnel)
+      if ($capturedUrl -and -not $process.HasExited) {
+        try {
+          $pubRes = Invoke-WebRequest -Uri "$capturedUrl/openapi.json" -Method Get -UseBasicParsing -TimeoutSec 5 -ErrorAction Stop
+          if ($pubRes.StatusCode -ne 200) {
+            Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Public Tunnel Endpoint: Responded with HTTP $($pubRes.StatusCode)" -ForegroundColor Yellow
+          }
+        }
+        catch {
+          Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Public Tunnel Endpoint: UNREACHABLE ($capturedUrl)." -ForegroundColor Yellow
+        }
+      }
+    }
+
+    # 2. Check if cloudflared process exited unexpectedly
+    if ($process.HasExited) {
+      Write-Host "`n[$(Get-Date -Format 'HH:mm:ss')] Warning: Cloudflare Quick Tunnel process exited unexpectedly. Auto-recovering..." -ForegroundColor Yellow
+
+      $startOffset = 0
+      if (Test-Path -LiteralPath $logFile) {
+        $startOffset = (Get-Item -LiteralPath $logFile).Length
+      }
+      $process = Start-Process -FilePath $cfExe -ArgumentList $cfArgs -PassThru -NoNewWindow
+      if (-not $process -or $process.HasExited) {
+        $consecutiveFailures++
+        $backoffSec = [Math]::Min(60, 5 * [Math]::Pow(2, [Math]::Min($consecutiveFailures - 1, 4)))
+        Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Failed to restart cloudflared process (attempt $consecutiveFailures). Retrying in ${backoffSec}s..." -ForegroundColor Red
+        Start-Sleep -Seconds $backoffSec
+        continue
+      }
+
+      Write-Host "Waiting for Cloudflare to assign new Quick Tunnel URL..." -NoNewline
+      $capturedUrl = $null
+      $recoverStart = [DateTime]::UtcNow
+      while (-not $process.HasExited -and -not $capturedUrl) {
+        if (($([DateTime]::UtcNow - $recoverStart)).TotalSeconds -gt 40) { break }
+        Start-Sleep -Milliseconds 700
+        Write-Host "." -NoNewline
+        if (Test-Path -LiteralPath $logFile) {
+          $logContent = ""
+          try {
+            $fileStream = [System.IO.File]::Open($logFile, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
+            try {
+              if ($fileStream.Length -gt $startOffset) {
+                $null = $fileStream.Seek($startOffset, [System.IO.SeekOrigin]::Begin)
+                $reader = [System.IO.StreamReader]::new($fileStream)
+                $logContent = $reader.ReadToEnd()
+              }
+            }
+            finally {
+              $fileStream.Dispose()
+            }
+          }
+          catch {
+            $logContent = Get-Content -Raw -LiteralPath $logFile -ErrorAction SilentlyContinue
+          }
+
+          if ($logContent) {
+            $urlMatches = [regex]::Matches($logContent, 'https://([a-zA-Z0-9-]+\.trycloudflare\.com)')
+            if ($urlMatches.Count -gt 0) {
+              $capturedUrl = $urlMatches[$urlMatches.Count - 1].Groups[0].Value.Trim()
+            }
+          }
+        }
+      }
+      Write-Host ""
+
+      if (-not $capturedUrl) {
+        # Recovery timeout: process alive but failed to produce URL within 40 seconds
+        if (-not $process.HasExited) {
+          Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Process failed to produce URL within 40s. Terminating failed process..." -ForegroundColor Yellow
+          Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+        }
+        $consecutiveFailures++
+        $backoffSec = [Math]::Min(60, 5 * [Math]::Pow(2, [Math]::Min($consecutiveFailures - 1, 4)))
+        Write-Host "[$(Get-Date -Format 'HH:mm:ss')] URL discovery timed out (attempt $consecutiveFailures). Waiting ${backoffSec}s before retrying..." -ForegroundColor Red
+        Start-Sleep -Seconds $backoffSec
+      }
+      else {
+        $consecutiveFailures = 0
+        Set-ActiveTunnelState -Url $capturedUrl -ProcessId $process.Id -SupervisorProcessId $PID -IsActive $true -TunnelType 'quick'
+        Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Quick Tunnel auto-recovered! New URL: $capturedUrl" -ForegroundColor Green
+        Write-Host "[$(Get-Date -Format 'HH:mm:ss')] NOTE: ChatGPT saved connector must be updated to $capturedUrl" -ForegroundColor Yellow
+      }
+    }
   }
 }
 finally {
-  if (-not $process.HasExited) {
+  Set-ActiveTunnelState -Url $capturedUrl -ProcessId 0 -SupervisorProcessId $PID -IsActive $false -TunnelType 'quick'
+  if ($process -and -not $process.HasExited) {
     Write-Host "`nStopping Cloudflare Quick Tunnel..." -ForegroundColor Cyan
     Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
     Write-Host "Tunnel stopped cleanly. Endpoint revoked." -ForegroundColor Green

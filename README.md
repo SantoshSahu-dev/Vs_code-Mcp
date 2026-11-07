@@ -376,14 +376,34 @@ When using Code Bridge with local AI tools (such as Antigravity IDE or Claude De
 
 ---
 
-## 17. Remote Deployment via User-Owned Cloudflare Tunnel
+## 17. Remote Deployment via Cloudflare Tunnel
 
 When using web AI assistants (Claude Web, ChatGPT Custom GPTs, Gemini Custom Apps) that run in the cloud:
 
-1. You must run your own Cloudflare Tunnel using your own Cloudflare account.
-2. The tunnel forwards traffic exclusively to port `3333` (the MCP server).
-3. **Port 3334 (VS Code service) must NEVER be forwarded.**
-4. Your tunnel hostname must be added to `CODE_BRIDGE_ALLOWED_HOSTS` in `.env`.
+### 17.1 Cloudflare Named Tunnel with Custom Domain (Primary Solution — Recommended)
+For persistent, zero-maintenance remote connections:
+1. Run a free Cloudflare Named Tunnel using a dedicated domain on Cloudflare DNS (e.g. `code-bridge.yourdomain.com`).
+2. Configure `~/.cloudflared/config.yml` from `cloudflared-config.example.yml`.
+3. Start the tunnel:
+   ```powershell
+   .\start-cloudflared.ps1 -ConfigPath ~/.cloudflared/config.yml
+   ```
+4. **Persistent URL Advantage**: The public endpoint `https://code-bridge.yourdomain.com/mcp` is completely permanent. You configure ChatGPT or Claude Web once, and restarting the local server or tunnel never requires updating, deleting, or recreating the connector.
+5. All OAuth client registrations and refresh tokens remain valid across server and tunnel restarts.
+
+### 17.2 Cloudflare Quick Tunnel with Supervisor (Secondary / Development Option)
+For quick testing without a custom domain:
+1. Launch the Quick Tunnel supervisor:
+   ```powershell
+   powershell -File .\start-quick-tunnel.ps1
+   ```
+2. **Supervisor Features**:
+   - Automatically assigns a temporary `trycloudflare.com` URL.
+   - Atomically records live connection status and PID to `logs/active-tunnel.json`.
+   - Continuously monitors local server health (`http://127.0.0.1:3333/health`) and auto-recovers if `cloudflared` disconnects.
+3. **Important ChatGPT Connector Limitation**:
+   - Cloudflare Quick Tunnel URLs are ephemeral and assign a new random subdomain on restart.
+   - ChatGPT's Custom MCP Connector and Custom GPT Actions do not support dynamic URL updating. If the Quick Tunnel restarts and assigns a new URL, the saved URL in ChatGPT must be updated to match the active tunnel. For permanent zero-reconfiguration, use a Cloudflare Named Tunnel (Section 17.1).
 
 ---
 
@@ -552,6 +572,7 @@ ChatGPT Custom GPTs connect to Code Bridge via its OpenAPI 3.0.3 specification:
 | `CODE_BRIDGE_ALLOW_READ_GENERATED` | No | `false` | Set to `true` to allow reading `node_modules` or `dist`. |
 | `CODE_BRIDGE_STATE_DIR` | No | `~/.code-bridge` | Storage folder for approvals and SQLite DB. |
 | `CODE_BRIDGE_AUDIT_LOG` | No | `logs/audit.jsonl`| Path to append-only JSONL audit log. |
+| `CODE_BRIDGE_OAUTH_KEY` | No | `CODE_BRIDGE_TOKEN` | Dedicated encryption key for OAuth database; decouples OAuth persistence from token rotation. |
 | `OAUTH_CLIENT_ID` | No | — | Static OAuth client ID. |
 | `OAUTH_CLIENT_SECRET` | No | — | Static OAuth client secret. |
 | `OAUTH_ALLOWED_REDIRECT_URIS` | No | — | Comma-separated allowed OAuth callback URLs. |

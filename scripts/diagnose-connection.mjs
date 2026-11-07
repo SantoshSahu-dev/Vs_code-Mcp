@@ -78,17 +78,21 @@ export async function runDiagnostics(options = {}) {
     results.recoveryActions.push("Local server is not running. Start it with: npm start");
   }
 
-  // 2. Check Quick Tunnel Process & Hostname
+  // 2. Check Quick / Named Tunnel Process & Hostname
+  const activeTunnelFile = path.join(rootDir, "logs", "active-tunnel.json");
   const logFile = path.join(rootDir, "logs", "quick-tunnel.log");
   let capturedUrl = null;
-  if (fs.existsSync(logFile)) {
+  let activeState = null;
+
+  if (fs.existsSync(activeTunnelFile)) {
     try {
-      const logContent = fs.readFileSync(logFile, "utf8");
-      const matches = logContent.match(/https:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com/g);
-      if (matches && matches.length > 0) {
-        capturedUrl = matches[matches.length - 1];
+      const parsed = JSON.parse(fs.readFileSync(activeTunnelFile, "utf8"));
+      if (parsed && typeof parsed === "object" && typeof parsed.url === "string" && parsed.url.startsWith("https://")) {
+        activeState = parsed;
       }
-    } catch {}
+    } catch {
+      // Malformed state file handled gracefully
+    }
   }
 
   let cfRunning = false;
@@ -114,6 +118,27 @@ export async function runDiagnostics(options = {}) {
       }
     }
   } catch {}
+
+  // Validate active-tunnel.json against actual running process
+  // Do not trust active=true blindly if the process is no longer alive
+  if (activeState) {
+    const recordedPid = activeState.pid ? String(activeState.pid) : null;
+    const isPidAlive = recordedPid && cfPids.includes(recordedPid);
+    if (activeState.active !== false && (isPidAlive || (cfRunning && !recordedPid))) {
+      capturedUrl = activeState.url;
+    }
+  }
+
+  // Fallback to quick-tunnel.log if no valid active state was found
+  if (!capturedUrl && fs.existsSync(logFile)) {
+    try {
+      const logContent = fs.readFileSync(logFile, "utf8");
+      const matches = logContent.match(/https:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com/g);
+      if (matches && matches.length > 0) {
+        capturedUrl = matches[matches.length - 1];
+      }
+    } catch {}
+  }
 
   results.tunnelProcess.ok = cfRunning;
   results.tunnelProcess.pid = cfPids.join(", ") || null;

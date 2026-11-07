@@ -4,7 +4,8 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-const workspace = await fs.mkdtemp(path.join(os.tmpdir(), "code-bridge-test-"));
+const rawWorkspace = await fs.mkdtemp(path.join(os.tmpdir(), "code-bridge-test-"));
+const workspace = await fs.realpath(rawWorkspace);
 process.env.CODE_BRIDGE_WORKSPACE = workspace;
 process.env.CODE_BRIDGE_TOKEN = "test-token-not-a-real-secret-0123456789";
 process.env.CODE_BRIDGE_AUDIT_LOG = path.join(workspace, "audit.jsonl");

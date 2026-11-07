@@ -5,7 +5,8 @@ import path from "node:path";
 import http from "node:http";
 import test from "node:test";
 
-const testDir = await fs.mkdtemp(path.join(os.tmpdir(), "cb-ws-sync-test-"));
+const rawTestDir = await fs.mkdtemp(path.join(os.tmpdir(), "cb-ws-sync-test-"));
+const testDir = await fs.realpath(rawTestDir);
 const workspaceA = path.join(testDir, "project-alpha");
 const workspaceB = path.join(testDir, "project-beta");
 const workspaceOutside = path.join(testDir, "outside-folder");

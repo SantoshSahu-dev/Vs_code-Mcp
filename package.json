@@ -5,6 +5,9 @@
   "private": true,
   "description": "A local, approval-first MCP bridge between web AI chats and VS Code.",
   "type": "module",
+  "engines": {
+    "node": ">=22.5.0"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit",

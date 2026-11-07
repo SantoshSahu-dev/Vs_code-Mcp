@@ -66,4 +66,30 @@ test("Connection Diagnostics - independent checks and actionable recovery", asyn
     const serialized = JSON.stringify(results);
     assert.equal(serialized.includes("valid-diag-test-token"), false, "Diagnostics must never log token secret");
   });
+
+  await t.test("diagnostics supports programmatic options overriding process.env", async () => {
+    const mockFetch = async (url: string | URL | Request) => {
+      const urlStr = url.toString();
+      if (urlStr.includes("/health")) {
+        return new Response(JSON.stringify({
+          status: "ok",
+          workspace: "custom-workspace",
+          remoteMutationsBlocked: false,
+        }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      return new Response("Not found", { status: 404 });
+    };
+
+    const results = await runDiagnostics({
+      port: 3397,
+      token: "explicit-token-0123456789abcdef",
+      allowedHosts: "trycloudflare.com",
+      dbPath: tempDb,
+      fetchFn: mockFetch,
+    });
+
+    assert.equal(results.localServer.ok, true);
+    assert.equal(results.hostnameAlignment.ok, true);
+    assert.equal(results.oauthState.ok, true);
+  });
 });

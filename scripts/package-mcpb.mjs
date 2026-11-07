@@ -16,7 +16,7 @@ await build({
   bundle: true,
   format: "esm",
   platform: "node",
-  target: "node20",
+  target: "node22",
   outfile: path.join(stage, "server", "index.js"),
   legalComments: "none",
   plugins: [

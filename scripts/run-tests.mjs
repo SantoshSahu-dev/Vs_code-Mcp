@@ -30,7 +30,13 @@ if (testFiles.length === 0) {
 const result = spawnSync(
   process.execPath,
   [require.resolve("tsx/cli"), "--test", "--test-concurrency=1", ...testFiles],
-  { stdio: "inherit" },
+  {
+    stdio: "inherit",
+    env: {
+      ...process.env,
+      NODE_ENV: process.env.NODE_ENV || "test",
+    },
+  },
 );
 
 if (result.error) {

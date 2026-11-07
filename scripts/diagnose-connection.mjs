@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { execSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
@@ -13,35 +13,35 @@ const rootDir = path.resolve(__dirname, "..");
 function loadEnv() {
   const envPath = path.join(rootDir, ".env");
   if (!fs.existsSync(envPath)) return {};
-  const content = fs.readFileSync(envPath, "utf8");
-  const env = {};
-  for (const line of content.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const eqIdx = trimmed.indexOf("=");
-    if (eqIdx !== -1) {
-      const key = trimmed.slice(0, eqIdx).trim();
-      const val = trimmed.slice(eqIdx + 1).trim();
-      env[key] = val;
+  try {
+    const content = fs.readFileSync(envPath, "utf8");
+    const env = {};
+    for (const line of content.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const eqIdx = trimmed.indexOf("=");
+      if (eqIdx !== -1) {
+        const key = trimmed.slice(0, eqIdx).trim();
+        const val = trimmed.slice(eqIdx + 1).trim();
+        env[key] = val;
+      }
     }
+    return env;
+  } catch {
+    return {};
   }
-  return env;
 }
 
-const env = loadEnv();
-const port = Number(process.env.PORT || env.PORT || 3333);
-const token = process.env.CODE_BRIDGE_TOKEN || env.CODE_BRIDGE_TOKEN || "";
-const allowedHosts = (process.env.CODE_BRIDGE_ALLOWED_HOSTS || env.CODE_BRIDGE_ALLOWED_HOSTS || "")
-  .split(",")
-  .map(s => s.trim().toLowerCase())
-  .filter(Boolean);
-const stateDir = process.env.CODE_BRIDGE_STATE_DIR || path.join(os.homedir(), ".code-bridge");
-
-console.log("\n========================================================");
-console.log("   Code Bridge MCP — Connectivity & OAuth Diagnostics   ");
-console.log("========================================================\n");
-
 export async function runDiagnostics(options = {}) {
+  const env = loadEnv();
+  const port = Number(options.port ?? process.env.PORT ?? env.PORT ?? 3333);
+  const token = options.token !== undefined ? options.token : (process.env.CODE_BRIDGE_TOKEN || env.CODE_BRIDGE_TOKEN || "");
+  const rawAllowedHosts = options.allowedHosts ?? process.env.CODE_BRIDGE_ALLOWED_HOSTS ?? env.CODE_BRIDGE_ALLOWED_HOSTS ?? "";
+  const allowedHosts = (Array.isArray(rawAllowedHosts) ? rawAllowedHosts : rawAllowedHosts.split(","))
+    .map(s => s.trim().toLowerCase())
+    .filter(Boolean);
+  const stateDir = options.stateDir ?? process.env.CODE_BRIDGE_STATE_DIR ?? path.join(os.homedir(), ".code-bridge");
+
   const results = {
     localServer: { ok: false, message: "" },
     tunnelProcess: { ok: false, pid: null, message: "" },
@@ -162,22 +162,22 @@ export async function runDiagnostics(options = {}) {
   }
 
   // 5. OAuth Persistence State Health
-  const dbPath = process.env.CODE_BRIDGE_OAUTH_DB || path.join(stateDir, "oauth.db");
+  const dbPath = options.dbPath || process.env.CODE_BRIDGE_OAUTH_DB || path.join(stateDir, "oauth.db");
   try {
     let OAuthStore;
     const distPath = path.join(rootDir, "dist", "oauth-store.js");
+    const srcJsPath = path.join(rootDir, "src", "oauth-store.js");
+    const srcTsPath = path.join(rootDir, "src", "oauth-store.ts");
     if (fs.existsSync(distPath)) {
-      ({ OAuthStore } = await import("../dist/oauth-store.js"));
+      ({ OAuthStore } = await import(pathToFileURL(distPath).href));
+    } else if (fs.existsSync(srcJsPath)) {
+      ({ OAuthStore } = await import(pathToFileURL(srcJsPath).href));
     } else {
-      try {
-        ({ OAuthStore } = await import("../src/oauth-store.js"));
-      } catch {
-        ({ OAuthStore } = await import("../src/oauth-store.ts"));
-      }
+      ({ OAuthStore } = await import(pathToFileURL(srcTsPath).href));
     }
     const store = new OAuthStore({
       dbPath,
-      secret: process.env.CODE_BRIDGE_OAUTH_KEY || token,
+      secret: options.oauthKey || process.env.CODE_BRIDGE_OAUTH_KEY || token,
     });
     const pruned = store.pruneExpiredTokens();
     const stats = store.getStats();
@@ -196,6 +196,10 @@ export async function runDiagnostics(options = {}) {
 
 // CLI Output Formatter
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))) {
+  console.log("\n========================================================");
+  console.log("   Code Bridge MCP — Connectivity & OAuth Diagnostics   ");
+  console.log("========================================================\n");
+
   const results = await runDiagnostics();
 
   console.log(`[1] Local Server Health:        ${results.localServer.ok ? "✓ PASS" : "✗ FAIL"}`);

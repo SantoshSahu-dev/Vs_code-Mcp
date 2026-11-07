@@ -16,7 +16,7 @@ $serverProcess = $null
 try {
   # Get-Command returns a CommandInfo object. Convert the existence check
   # explicitly so PowerShell never tries to bind that object to [bool].
-  Require -Condition ($null -ne (Get-Command node -ErrorAction SilentlyContinue)) -Message 'Node.js 20+ is required.'
+  Require -Condition ($null -ne (Get-Command node -ErrorAction SilentlyContinue)) -Message 'Node.js 22+ (v22.5.0+) is required.'
   Require -Condition ($null -ne (Get-Command npm -ErrorAction SilentlyContinue)) -Message 'npm is required.'
   Pass 'Node.js and npm found'
 

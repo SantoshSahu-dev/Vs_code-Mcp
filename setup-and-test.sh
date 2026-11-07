@@ -26,7 +26,7 @@ echo "   Code Bridge MCP — Local Verification Suite (Unix)    "
 echo "========================================================"
 
 # 1. Check Prerequisites
-command -v node >/dev/null 2>&1 || { echo "FAIL: Node.js 20+ is required."; exit 1; }
+command -v node >/dev/null 2>&1 || { echo "FAIL: Node.js 22+ (v22.5.0+) is required."; exit 1; }
 command -v npm >/dev/null 2>&1 || { echo "FAIL: npm is required."; exit 1; }
 echo "PASS: Node.js and npm found."
 

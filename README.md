@@ -4,7 +4,7 @@
 
 [![CI Pipeline](https://github.com/YOUR_GITHUB_USERNAME/code-bridge/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_GITHUB_USERNAME/code-bridge/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Node.js Version](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen)](https://nodejs.org)
+[![Node.js Version](https://img.shields.io/badge/node-%3E%3D22.5.0-brightgreen)](https://nodejs.org)
 [![MCP Protocol Version](https://img.shields.io/badge/MCP-2025--03--26-blueviolet)](https://modelcontextprotocol.io)
 
 ---
@@ -65,7 +65,7 @@ Before installing Code Bridge, ensure your development workstation meets these r
    - macOS 12+ (Apple Silicon or Intel).
    - Linux (Ubuntu 20.04+, Debian 11+, Fedora, Arch).
 2. **Node.js Runtime**:
-   - **Node.js v20.0.0 or later** (LTS recommended).
+   - **Node.js v22.5.0 or later** (Node.js 22 LTS or Node.js 24 recommended; requires built-in `node:sqlite` support).
    - Check your installed version: `node --version`.
    - npm v10.0.0 or later.
 3. **Editor Integration (Optional but Recommended)**:
@@ -285,7 +285,7 @@ code-bridge/
 
 ## 10. Technology Stack
 
-- **Runtime**: Node.js (v20+ LTS) using ES Modules (`"type": "module"`).
+- **Runtime**: Node.js (v22.5.0+ LTS or Node.js 24) using ES Modules (`"type": "module"`).
 - **Language**: TypeScript (v5.8+) with strict type checking enabled.
 - **Protocol**: Model Context Protocol (`@modelcontextprotocol/sdk`).
 - **Server Framework**: Express (`v5.1+`) with disabled `x-powered-by`, strict JSON parsing, and body size limits.

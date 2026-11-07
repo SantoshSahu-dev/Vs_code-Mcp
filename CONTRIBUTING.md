@@ -24,7 +24,7 @@ When contributing code, the following security invariants must **never** be brok
 ## 2. Development Setup
 
 ### Prerequisites:
-- **Node.js**: v20.x or later (LTS recommended)
+- **Node.js**: v22.5.0 or later (Node 22 LTS or Node 24 recommended)
 - **npm**: v10.x or later
 - **VS Code**: v1.102.0 or later (for extension development)
 

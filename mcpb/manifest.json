@@ -24,7 +24,7 @@
   "compatibility": {
     "platforms": ["win32"],
     "runtimes": {
-      "node": ">=20.0.0"
+      "node": ">=22.5.0"
     }
   },
   "user_config": {
